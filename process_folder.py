@@ -12,13 +12,24 @@ def load_model(opt, weights_path):
     # Set device and initialize the model
     opt['dist'] = False
     opt['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    opt['is_train'] = False
+    opt["is_train"] = False  # Ensure the model is in inference mode
     model = create_model(opt)
 
     # Load the network weights
     load_net = torch.load(weights_path)
-    load_net = load_net['params']
-    model.net_g.load_state_dict(load_net, strict=True)
+
+    # Handle different weight formats
+    if 'params_ema' in load_net:
+        keyname = 'params_ema'
+    elif 'params' in load_net:
+        keyname = 'params'
+    else:
+        keyname = None
+
+    if keyname:
+        model.net_g.load_state_dict(load_net[keyname], strict=True)
+    else:
+        model.net_g.load_state_dict(load_net, strict=True)
 
     return model
 
@@ -58,11 +69,16 @@ def main():
     with open(args.opt, mode='r') as f:
         opt = yaml.safe_load(f)
 
+    # !!! THIS IS THE FIX !!!
+    # Set the model to validation/test mode
+    opt['is_train'] = False
+    opt['val']['suffix'] = '' # Avoids creating a subdirectory for results
+
     # Load the model
     model = load_model(opt, args.weights)
 
     # Process each image in the input folder
-    for filename in os.listdir(args.input_folder):
+    for filename in sorted(os.listdir(args.input_folder)):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
             print(f"Processing {filename}...")
             input_path = os.path.join(args.input_folder, filename)
