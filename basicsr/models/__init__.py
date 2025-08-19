@@ -1,42 +1,80 @@
-import importlib
-from os import path as osp
+import torch
+import cv2
+import os
+import argparse
+import yaml
+from basicsr.models import create_model
+from basicsr.utils import imfrombytes, img2tensor
+import numpy as np
 
-from basicsr.utils import get_root_logger, scandir
+def load_model(opt, weights_path):
+    """Loads the model using the provided options and weights."""
+    opt['dist'] = False
+    opt['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = create_model(opt)
 
-# automatically scan and import model modules
-# scan all the files under the 'models' folder and collect files ending with
-# '_model.py'
-model_folder = osp.dirname(osp.abspath(__file__))
-model_filenames = [
-    osp.splitext(osp.basename(v))[0] for v in scandir(model_folder)
-    if v.endswith('_model.py')
-]
-# import all the model modules
-_model_modules = [
-    importlib.import_module(f'basicsr.models.{file_name}')
-    for file_name in model_filenames
-]
+    load_net = torch.load(weights_path)
 
+    if 'params_ema' in load_net:
+        keyname = 'params_ema'
+    elif 'params' in load_net:
+        keyname = 'params'
+    else:
+        keyname = None
 
-def create_model(opt):
-    """Create model.
+    if keyname:
+        model.net_g.load_state_dict(load_net[keyname], strict=True)
+    else:
+        model.net_g.load_state_dict(load_net, strict=True)
 
-    Args:
-        opt (dict): Configuration. It constains:
-            model_type (str): Model type.
-    """
-    model_type = opt['model_type']
-
-    # dynamic instantiation
-    for module in _model_modules:
-        model_cls = getattr(module, model_type, None)
-        if model_cls is not None:
-            break
-    if model_cls is None:
-        raise ValueError(f'Model {model_type} is not found.')
-
-    model = model_cls(opt)
-
-    logger = get_root_logger()
-    logger.info(f'Model [{model.__class__.__name__}] is created.')
     return model
+
+def process_image(model, img_path):
+    """Processes a single image by directly using the model's network."""
+    # Read and prepare the image
+    img_bytes = open(img_path, 'rb').read()
+    img = imfrombytes(img_bytes, float32=True)
+    img = img2tensor(img, bgr2rgb=True, float32=True)
+    img = img.unsqueeze(0).to('cuda')
+
+    # Directly run inference with the network (model.net_g)
+    with torch.no_grad():
+        model.net_g.eval() # Set to evaluation mode
+        output = model.net_g(img)
+
+    # Convert tensor to savable image format
+    restored = torch.clamp(output, 0, 1)
+    restored = restored.squeeze(0).cpu().permute(1, 2, 0).numpy()
+    return (restored * 255.0).round().astype(np.uint8)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--opt', type=str, required=True, help='Path to the model configuration file (YML)')
+    parser.add_argument('--weights', type=str, required=True, help='Path to the model weights (.pth)')
+    parser.add_argument('--input_folder', type=str, required=True, help='Path to the input folder with images')
+    parser.add_argument('--output_folder', type=str, required=True, help='Path to the output folder')
+    args = parser.parse_args()
+
+    os.makedirs(args.output_folder, exist_ok=True)
+
+    with open(args.opt, mode='r') as f:
+        opt = yaml.safe_load(f)
+
+    # Set the model to validation/test mode
+    opt['is_train'] = False
+    if 'val' in opt.keys():
+        opt['val']['suffix'] = ''
+
+    model = load_model(opt, args.weights)
+
+    for filename in sorted(os.listdir(args.input_folder)):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
+            print(f"Processing {filename}...")
+            input_path = os.path.join(args.input_folder, filename)
+            output_image = process_image(model, input_path)
+            output_path = os.path.join(args.output_folder, filename)
+            cv2.imwrite(output_path, cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR))
+            print(f"Saved processed image to {output_path}")
+
+if __name__ == "__main__":
+    main()
