@@ -6,6 +6,7 @@ import yaml
 from basicsr.models import create_model
 from basicsr.utils import imfrombytes, img2tensor
 import numpy as np
+import torch.nn.functional as F
 
 def load_model(opt, weights_path):
     """Loads the model using the provided options and weights."""
@@ -37,10 +38,28 @@ def process_image(model, img_path):
     img = img2tensor(img, bgr2rgb=True, float32=True)
     img = img.unsqueeze(0).to('cuda')
 
+    # --- THIS IS THE FIX ---
+    # Pad the image to be divisible by a factor (e.g., 16 or 32)
+    mod_pad_h, mod_pad_w = 0, 0
+    h, w = img.size()[2], img.size()[3]
+    factor = 16 # A safe factor for many networks
+    if h % factor != 0:
+        mod_pad_h = factor - h % factor
+    if w % factor != 0:
+        mod_pad_w = factor - w % factor
+    img = F.pad(img, (0, mod_pad_w, 0, mod_pad_h), 'reflect')
+    # -----------------------
+
     # Directly run inference with the network (model.net_g)
     with torch.no_grad():
         model.net_g.eval() # Set to evaluation mode
         output = model.net_g(img)
+
+    # --- CROP THE PADDING ---
+    # Remove the padding to restore original size
+    _, _, h, w = output.size()
+    output = output[:, :, 0:h - mod_pad_h, 0:w - mod_pad_w]
+    # ------------------------
 
     # Convert tensor to savable image format
     restored = torch.clamp(output, 0, 1)
@@ -60,7 +79,6 @@ def main():
     with open(args.opt, mode='r') as f:
         opt = yaml.safe_load(f)
 
-    # Set the model to validation/test mode
     opt['is_train'] = False
     if 'val' in opt.keys():
         opt['val']['suffix'] = ''
