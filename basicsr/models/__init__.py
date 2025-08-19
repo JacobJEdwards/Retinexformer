@@ -3,49 +3,8 @@ import cv2
 import os
 import argparse
 import yaml
-from basicsr.models import create_model
-from basicsr.utils import imfrombytes, img2tensor
+from basicsr.models import process_image
 import numpy as np
-
-def load_model(opt, weights_path):
-    """Loads the model using the provided options and weights."""
-    opt['dist'] = False
-    opt['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = create_model(opt)
-
-    load_net = torch.load(weights_path)
-
-    if 'params_ema' in load_net:
-        keyname = 'params_ema'
-    elif 'params' in load_net:
-        keyname = 'params'
-    else:
-        keyname = None
-
-    if keyname:
-        model.net_g.load_state_dict(load_net[keyname], strict=True)
-    else:
-        model.net_g.load_state_dict(load_net, strict=True)
-
-    return model
-
-def process_image(model, img_path):
-    """Processes a single image by directly using the model's network."""
-    # Read and prepare the image
-    img_bytes = open(img_path, 'rb').read()
-    img = imfrombytes(img_bytes, float32=True)
-    img = img2tensor(img, bgr2rgb=True, float32=True)
-    img = img.unsqueeze(0).to('cuda')
-
-    # Directly run inference with the network (model.net_g)
-    with torch.no_grad():
-        model.net_g.eval() # Set to evaluation mode
-        output = model.net_g(img)
-
-    # Convert tensor to savable image format
-    restored = torch.clamp(output, 0, 1)
-    restored = restored.squeeze(0).cpu().permute(1, 2, 0).numpy()
-    return (restored * 255.0).round().astype(np.uint8)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -62,8 +21,7 @@ def main():
 
     # Set the model to validation/test mode
     opt['is_train'] = False
-    if 'val' in opt.keys():
-        opt['val']['suffix'] = ''
+    opt['val']['suffix'] = '' # Avoids creating a subdirectory for results
 
     model = load_model(opt, args.weights)
 
