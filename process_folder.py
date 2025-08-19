@@ -12,6 +12,7 @@ def load_model(opt, weights_path):
     # Set device and initialize the model
     opt['dist'] = False
     opt['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    opt['is_train'] = False
     model = create_model(opt)
 
     # Load the network weights
