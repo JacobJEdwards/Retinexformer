@@ -1,38 +1,42 @@
-import torch
-import cv2
-import os
-import argparse
-import yaml
-from basicsr.models import process_image
-import numpy as np
+import importlib
+from os import path as osp
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--opt', type=str, required=True, help='Path to the model configuration file (YML)')
-    parser.add_argument('--weights', type=str, required=True, help='Path to the model weights (.pth)')
-    parser.add_argument('--input_folder', type=str, required=True, help='Path to the input folder with images')
-    parser.add_argument('--output_folder', type=str, required=True, help='Path to the output folder')
-    args = parser.parse_args()
+from basicsr.utils import get_root_logger, scandir
 
-    os.makedirs(args.output_folder, exist_ok=True)
+# automatically scan and import model modules
+# scan all the files under the 'models' folder and collect files ending with
+# '_model.py'
+model_folder = osp.dirname(osp.abspath(__file__))
+model_filenames = [
+    osp.splitext(osp.basename(v))[0] for v in scandir(model_folder)
+    if v.endswith('_model.py')
+]
+# import all the model modules
+_model_modules = [
+    importlib.import_module(f'basicsr.models.{file_name}')
+    for file_name in model_filenames
+]
 
-    with open(args.opt, mode='r') as f:
-        opt = yaml.safe_load(f)
 
-    # Set the model to validation/test mode
-    opt['is_train'] = False
-    opt['val']['suffix'] = '' # Avoids creating a subdirectory for results
+def create_model(opt):
+    """Create model.
 
-    model = load_model(opt, args.weights)
+    Args:
+        opt (dict): Configuration. It constains:
+            model_type (str): Model type.
+    """
+    model_type = opt['model_type']
 
-    for filename in sorted(os.listdir(args.input_folder)):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
-            print(f"Processing {filename}...")
-            input_path = os.path.join(args.input_folder, filename)
-            output_image = process_image(model, input_path)
-            output_path = os.path.join(args.output_folder, filename)
-            cv2.imwrite(output_path, cv2.cvtColor(output_image, cv2.COLOR_RGB2BGR))
-            print(f"Saved processed image to {output_path}")
+    # dynamic instantiation
+    for module in _model_modules:
+        model_cls = getattr(module, model_type, None)
+        if model_cls is not None:
+            break
+    if model_cls is None:
+        raise ValueError(f'Model {model_type} is not found.')
 
-if __name__ == "__main__":
-    main()
+    model = model_cls(opt)
+
+    logger = get_root_logger()
+    logger.info(f'Model [{model.__class__.__name__}] is created.')
+    return model

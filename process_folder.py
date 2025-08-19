@@ -4,21 +4,17 @@ import os
 import argparse
 import yaml
 from basicsr.models import create_model
-from basicsr.utils import FileClient, imfrombytes, img2tensor, padding
+from basicsr.utils import imfrombytes, img2tensor
 import numpy as np
 
 def load_model(opt, weights_path):
     """Loads the model using the provided options and weights."""
-    # Set device and initialize the model
     opt['dist'] = False
     opt['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    opt["is_train"] = False  # Ensure the model is in inference mode
     model = create_model(opt)
 
-    # Load the network weights
     load_net = torch.load(weights_path)
 
-    # Handle different weight formats
     if 'params_ema' in load_net:
         keyname = 'params_ema'
     elif 'params' in load_net:
@@ -34,25 +30,22 @@ def load_model(opt, weights_path):
     return model
 
 def process_image(model, img_path):
-    """Processes a single image."""
+    """Processes a single image by directly using the model's network."""
     # Read and prepare the image
     img_bytes = open(img_path, 'rb').read()
     img = imfrombytes(img_bytes, float32=True)
     img = img2tensor(img, bgr2rgb=True, float32=True)
     img = img.unsqueeze(0).to('cuda')
 
-    # Inference
+    # Directly run inference with the network (model.net_g)
     with torch.no_grad():
-        model.feed_data(data={'lq': img})
-        model.test()
-        visuals = model.get_current_visuals()
-        restored = visuals['rlt']
+        model.net_g.eval() # Set to evaluation mode
+        output = model.net_g(img)
 
-    # Convert to numpy and save
-    restored = torch.clamp(restored, 0, 1)
+    # Convert tensor to savable image format
+    restored = torch.clamp(output, 0, 1)
     restored = restored.squeeze(0).cpu().permute(1, 2, 0).numpy()
     return (restored * 255.0).round().astype(np.uint8)
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -62,22 +55,18 @@ def main():
     parser.add_argument('--output_folder', type=str, required=True, help='Path to the output folder')
     args = parser.parse_args()
 
-    # Create output folder if it doesn't exist
     os.makedirs(args.output_folder, exist_ok=True)
 
-    # Parse options file
     with open(args.opt, mode='r') as f:
         opt = yaml.safe_load(f)
 
-    # !!! THIS IS THE FIX !!!
     # Set the model to validation/test mode
     opt['is_train'] = False
-    opt['val']['suffix'] = '' # Avoids creating a subdirectory for results
+    if 'val' in opt.keys():
+        opt['val']['suffix'] = ''
 
-    # Load the model
     model = load_model(opt, args.weights)
 
-    # Process each image in the input folder
     for filename in sorted(os.listdir(args.input_folder)):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff')):
             print(f"Processing {filename}...")
