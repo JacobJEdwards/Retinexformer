@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 
 from setuptools import find_packages, setup
-
 import os
 import subprocess
 import sys
 import time
-import torch
-from torch.utils.cpp_extension import (BuildExtension, CppExtension,
-                                       CUDAExtension)
 
 version_file = 'basicsr/version.py'
 
@@ -21,15 +17,12 @@ def readme():
 
 
 def get_git_hash():
-
     def _minimal_ext_cmd(cmd):
-        # construct minimal environment
         env = {}
         for k in ['SYSTEMROOT', 'PATH', 'HOME']:
             v = os.environ.get(k)
             if v is not None:
                 env[k] = v
-        # LANGUAGE is used on win32
         env['LANGUAGE'] = 'C'
         env['LANG'] = 'C'
         env['LC_ALL'] = 'C'
@@ -42,7 +35,6 @@ def get_git_hash():
         sha = out.strip().decode('ascii')
     except OSError:
         sha = 'unknown'
-
     return sha
 
 
@@ -57,7 +49,6 @@ def get_hash():
             raise ImportError('Unable to get git version')
     else:
         sha = 'unknown'
-
     return sha
 
 
@@ -88,6 +79,9 @@ def get_version():
 
 
 def make_cuda_ext(name, module, sources, sources_cuda=None):
+    import torch
+    from torch.utils.cpp_extension import (CppExtension, CUDAExtension)
+
     if sources_cuda is None:
         sources_cuda = []
     define_macros = []
@@ -172,5 +166,5 @@ if __name__ == '__main__':
         setup_requires=['cython', 'numpy'],
         install_requires=get_requirements(),
         ext_modules=ext_modules,
-        cmdclass={'build_ext': BuildExtension},
+        cmdclass={'build_ext': __import__('torch.utils.cpp_extension').BuildExtension},
         zip_safe=False)
