@@ -6,9 +6,46 @@
 # --- Configuration ---
 # Set the model you want to use here.
 # Make sure the WEIGHTS and CONFIG files match.
-WEIGHTS=("pretrained_weights/LOL_v2_real.pth" "pretrained_weights/LOL_v2_synthetic.pth")
-CONFIGS=("Options/Retinexformer_LOL_v2_real.yml" "Options/Retinexformer_LOL_v2_synthetic.yml")
-NAMES=("retinexformer_LOL_v2_real" "retinexformer_LOL_v2_synthetic")
+WEIGHTS=(
+  "pretrained_weights/LOL_v1.pth"
+  "pretrained_weights/LOL_v2_real.pth"
+  "pretrained_weights/LOL_v2_synthetic.pth"
+  "pretrained_weights/NTIRE.pth"
+  "pretrained_weights/SDSD_indoor.pth"
+  "pretrained_weights/SDSD_outdoor.pth"
+  "pretrained_weights/SID.pth"
+  "pretrained_weights/SMID.pth"
+  "pretrained_weights/FiveK.pth"
+  "pretrained_weights/MST_Plus_Plus_NTIRE/MST_Plus_Plus_4x1800.pth"
+  "pretrained_weights/MST_Plus_Plus_NTIRE/MST_Plus_Plus_8x1150.pth"
+)
+
+CONFIGS=(
+  "Options/RetinexFormer_LOL_v1.yml"
+  "Options/RetinexFormer_LOL_v2_real.yml"
+  "Options/RetinexFormer_LOL_v2_synthetic.yml"
+  "Options/RetinexFormer_NTIRE.yml"
+  "Options/RetinexFormer_SDSD_indoor.yml"
+  "Options/RetinexFormer_SDSD_outdoor.yml"
+  "Options/RetinexFormer_SID.yml"
+  "Options/RetinexFormer_SMID.yml"
+  "Options/RetinexFormer_FiveK.yml"
+  "Options/MST_Plus_Plus_NTIRE_4x1800.yml"
+  "Options/MST_Plus_Plus_NTIRE_8x1150.yml"
+)
+NAMES=(
+  "retinexformer_LOL_v1"
+  "retinexformer_LOL_v2_real"
+  "retinexformer_LOL_v2_synthetic"
+  "retinexformer_NTIRE"
+  "retinexformer_SDSD_indoor"
+  "retinexformer_SDSD_outdoor"
+  "retinexformer_SID"
+  "retinexformer_SMID"
+  "retinexformer_FiveK"
+  "retinexformer_MST_Plus_Plus_4x1800"
+  "retinexformer_MST_Plus_Plus_8x1150"
+)
 # ---------------------
 
 
