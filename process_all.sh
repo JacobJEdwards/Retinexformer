@@ -63,7 +63,7 @@ find "$MAIN_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r SUB_DIR; do
   echo "--- Processing subdirectory: $SUB_DIR ---"
 
   # Define the folders to process within each subdirectory
-  TARGET_FOLDERS=("images_8" "images_8_contrast" "images_8_multiexposure" "images_8_variance")
+  TARGET_FOLDERS=("images")
 
   for i in "${!WEIGHTS[@]}"; do
     WEIGHT="${WEIGHTS[$i]}"
