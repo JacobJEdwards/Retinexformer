@@ -75,7 +75,7 @@ find "$MAIN_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r SUB_DIR; do
 
     for FOLDER in "${TARGET_FOLDERS[@]}"; do
       INPUT_FOLDER="$SUB_DIR/$FOLDER"
-      OUTPUT_FOLDER="${INPUT_FOLDER}_${NAME}"
+      OUTPUT_FOLDER="$SUB_DIR/retinex/$NAME"
 
       if [ -d "$INPUT_FOLDER" ]; then
         echo "Processing folder: $INPUT_FOLDER"
